@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多人同步公文系統 Pro</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
+        .card { background: white; width: 100%; max-width: 400px; padding: 25px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .display { font-size: 24px; font-weight: bold; color: #2563eb; text-align: center; padding: 20px; border: 2px dashed #2563eb; margin: 15px 0; border-radius: 10px; background: #eff6ff; }
+        select, input, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; font-size: 16px; }
+        .btn-gen { background: #2563eb; color: white; border: none; }
+        .btn-void { background: white; color: #dc2626; border: 1px solid #dc2626; font-size: 14px; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .loading { color: #64748b; text-align: center; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2 style="text-align:center; color: #1e293b;">雲端同步取號</h2>
+    
+    <label style="font-size:14px; color:#64748b;">單位代字</label>
+    <select id="org"><option value="總">總務 (總)</option><option value="教">教務 (教)</option><option value="課">課務 (課)</option><option value="招">招生 (招)</option><option value="獎">獎學金 (獎)</option><option value="務">其他 (務)</option></select>
+    
+    <label style="font-size:14px; color:#64748b;">事由備註</label>
+    <input type="text" id="sub" placeholder="取號或作廢皆需填寫原因">
+    
+    <div id="result" class="display">等待連線...</div>
+    
+    <button id="genBtn" class="btn-gen" onclick="apiCall('generate')">產生新案號</button>
+    <button id="voidBtn" class="btn-void" onclick="apiCall('void')">作廢該單位最後一號</button>
+    
+    <div id="status" class="loading">系統就緒</div>
+</div>
+
+<script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwV8Z1yJBj0-_0QvOR1brE0ymg1gEATdEWkf3BFRbAzGVT23ERIxwXCQXklwCUDHcYh/exec";
+
+    async function apiCall(action) {
+        const org = document.getElementById('org').value;
+        const sub = document.getElementById('sub').value;
+        const resultBox = document.getElementById('result');
+        const status = document.getElementById('status');
+
+        if (!sub) return alert("請務必輸入「事由」或「作廢原因」！");
+        if (action === 'void' && !confirm(`確定要作廢【${org}】單位的最後一筆紀錄嗎？`)) return;
+
+        toggleButtons(true);
+        status.innerText = "雲端處理中...";
+        
+        try {
+            const resp = await fetch(`${GAS_URL}?action=${action}&org=${encodeURIComponent(org)}&sub=${encodeURIComponent(sub)}`, { method: 'POST' });
+            const data = await resp.json();
+            
+            if (action === 'generate') {
+                resultBox.innerText = data.id;
+                status.innerText = "✅ 取號完成並存入試算表";
+                document.getElementById('sub').value = "";
+            } else if (data.result === "voided") {
+                resultBox.innerText = "已作廢";
+                status.innerText = `❌ ${data.id} 已標記作廢`;
+                alert(`${data.id} 作廢成功，序號已釋放。`);
+            } else {
+                alert(data.msg || "操作失敗");
+            }
+        } catch (e) {
+            alert("連線失敗，請檢查網路或 GAS 設定");
+            status.innerText = "連線失敗";
+        } finally {
+            toggleButtons(false);
+        }
+    }
+
+    function toggleButtons(disabled) {
+        document.getElementById('genBtn').disabled = disabled;
+        document.getElementById('voidBtn').disabled = disabled;
+    }
+</script>
+
+</body>
+</html>
